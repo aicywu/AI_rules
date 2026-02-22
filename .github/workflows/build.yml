@@ -8,13 +8,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # --- 核心修改部分：增加写入权限 ---
+    permissions:
+      contents: write
+    # ------------------------------
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4 # 建议升级到 v4
         with:
           ref: main
+          # 默认 checkout 已经处理了认证，不需要手动传 token 也能 push
 
       - name: Install Python
-        run: sudo apt-get install -y python3 python3-pip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
 
       - name: Install dependencies
         run: pip install pyyaml requests
@@ -27,13 +36,17 @@ jobs:
 
       - name: Commit and push
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
+          # 建议使用官方标准的 bot 账号
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           if [ -f build/ai_merged.yaml ]; then
             git add build/ai_merged.yaml
-            git commit -m "Auto build AI merged rule" || echo "No changes"
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:main
+            # 如果没有文件变化，commit 会报错，这里用 || exit 0 优雅退出
+            git commit -m "Auto build AI merged rule" || { echo "No changes to commit"; exit 0; }
+            
+            # 简化 Push 命令：只要上面设置了 permissions，直接 git push 即可
+            git push origin main
           else
             echo "build/ai_merged.yaml not found, skipping commit"
           fi
