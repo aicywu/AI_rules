@@ -2,28 +2,43 @@ name: Build AI RULE-SET
 
 on:
   schedule:
-    - cron: '0 19 30 * *'   # 每月 1 日凌晨 3 点运行
+    - cron: '0 19 30 * *'   # 每月 1 日凌晨 3 点（UTC 时间，根据北京时间调整）
   workflow_dispatch:       # 手动触发
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 1️⃣ 拉取仓库代码
       - uses: actions/checkout@v3
 
+      # 2️⃣ 安装 Python
       - name: Install Python
         run: sudo apt-get install -y python3 python3-pip
 
+      # 3️⃣ 安装依赖库
       - name: Install dependencies
         run: pip install pyyaml requests
 
+      # 4️⃣ 创建 build 文件夹
+      - name: Create build folder
+        run: mkdir -p build
+
+      # 5️⃣ 运行 merge_rules.py 脚本
       - name: Merge rules
         run: python3 merge_rules.py
 
+      # 6️⃣ 提交并推送 ai_merged.yaml
       - name: Commit and push
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          git add build/ai-merged.yaml
-          git commit -m "Auto build AI merged rule" || echo "No changes"
-          git push
+          if [ -f build/ai_merged.yaml ]; then
+            git add build/ai_merged.yaml
+            git commit -m "Auto build AI merged rule" || echo "No changes"
+            git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }} HEAD:main
+          else
+            echo "build/ai_merged.yaml not found, skipping commit"
+          fi
